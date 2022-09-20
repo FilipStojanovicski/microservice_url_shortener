@@ -21,27 +21,11 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
 const Schema = mongoose.Schema;
 
 const urlSchema = new Schema({
-  url: {type: String, required: true},
-  shorturl: {type: Number, required: true}
+  original_url: {type: String, required: true},
+  short_url: {type: Number, required: true}
 })
 
 let urlModel = mongoose.model("url", urlSchema);
-
-// // Function to put URL in db
-// const createAndSaveURL = (url) => {
-//   let newURL = new urlModel({url: url, shorturl: 2});
-//   console.log(newURL);
-//   let savedURL = await newURL.save();
-//   console.log(savedURL);
-//   return savedURL;
-// };
-
-// const findURL = (urlToSearch) => {
-//   let urlFound = await urlModel.find({url: urlToSearch});
-//   console.log(urlFound);
-//   console.log()
-//   return urlFound;
-// };
 
 // Basic Configuration
 const port = process.env.PORT || 3000;
@@ -76,7 +60,7 @@ app.post('/api/shorturl', function(req, res) {
     try {
       url_obj = new URL(url);
     } catch (error){
-      res.json({error: "Invalid URL"});
+      res.json({error: "invalid url"});
     } 
   }
 
@@ -86,20 +70,21 @@ app.post('/api/shorturl', function(req, res) {
     dns.lookup(url_obj.hostname, function(err, address){
       if (address) {
         // Check if the URL already exists in the database
-        urlModel.find({url: url}, function (err, dataFound){
+        urlModel.find({original_url: url}, function (err, dataFound){
           // If not found in the database
           if (dataFound.length < 1){
             // Get the latest short url
-            urlModel.find({}).sort({shorturl: "desc"}).limit(1).
+            urlModel.find({}).sort({short_url: "desc"}).limit(1).
             then(
+
               function(latestData){
                 console.log(latestData);
                 let lastShortURL = 0;
                 if (latestData.length > 0){
-                  lastShortURL = parseInt(latestData[0].shorturl);
+                  lastShortURL = parseInt(latestData[0].short_url);
                 }
                 // Create new URL in the database with a short url incremented by one more than the current max
-                resObj = {url: url, shorturl: lastShortURL + 1};
+                resObj = {original_url: url, short_url: lastShortURL + 1};
                 let newURL = new urlModel(resObj);
                 newURL.save();
                 res.json(resObj);
@@ -107,16 +92,16 @@ app.post('/api/shorturl', function(req, res) {
           } 
           // If found in the database we do not need to create it
           else {
-            resObj = {url: dataFound[0].url, shorturl: parseInt(dataFound[0].shorturl)}
+            resObj = {original_url: dataFound[0].original_url, short_url: parseInt(dataFound[0].short_url)}
             res.json(resObj);
           }
-          console.log("find", err);
+          if (err) console.log("find", err);
         });
       }
       else{
-        res.json({error: "Invalid Hostname"});
+        res.json({error: "invalid url"});
       }
-      console.log("dns", err);
+      if (err) console.log("dns", err);
     });
   }
 });
@@ -126,9 +111,9 @@ app.get('/api/shorturl/:shorturl?', function(req, res) {
   console.log("get shorturl");
   var shorturl = req.params.shorturl;
   // If url exists re-direct
-  urlModel.findOne({shorturl: shorturl}).then(function(foundData){
+  urlModel.findOne({short_url: shorturl}).then(function(foundData){
     if (foundData){
-      res.redirect(foundData.url);
+      res.redirect(foundData.original_url);
     } else {
       res.json({error:"No short URL found for the given input"});
     }
